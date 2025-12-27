@@ -1,0 +1,38 @@
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.ensemble import RandomForestClassifier
+import joblib
+
+# 1. 간단한 학습 데이터 (더 많은 데이터를 넣을수록 정확해집니다)
+data = {
+    'payload': [
+        "SELECT * FROM users WHERE id='1' OR '1'='1'",  # Injection
+        "<script>alert('XSS')</script>",                 # Injection (XSS)
+        "../../etc/passwd",                             # Path Traversal
+        "GET /admin/delete?id=10",                      # Access Control
+        "GET /index.php",                               # Normal
+        "password123",                                  # Normal
+    ],
+    'label': [
+        "A05:Injection", "A05:Injection", "A01:Broken Access Control", 
+        "A01:Broken Access Control", "Normal", "Normal"
+    ]
+}
+
+df = pd.DataFrame(data)
+
+# 2. 텍스트 특징 추출 (TF-IDF)
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(df['payload'])
+y = df['label']
+
+# 3. 모델 학습 (랜덤 포레스트)
+model = RandomForestClassifier()
+model.fit(X, y)
+
+# 4. 모델 및 벡터라이저 저장
+# 이 파일들을 ai_engine/model/ 폴더 안에 넣어야 합니다.
+joblib.dump(model, 'owasp_model.pkl')
+joblib.dump(vectorizer, 'vectorizer.pkl')
+
+print("AI 모델 생성 완료: owasp_model.pkl")

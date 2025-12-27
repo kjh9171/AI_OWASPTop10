@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-multipart
+elasticsearch
+scikit-learn
+joblib
+pandas
