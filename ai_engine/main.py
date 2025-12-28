@@ -1,20 +1,21 @@
 from fastapi import FastAPI, UploadFile, File
 from elasticsearch import Elasticsearch
+import joblib
 import datetime
+import os
 
 app = FastAPI()
-es = Elasticsearch("http://elasticsearch:9200")
+es = Elasticsearch(os.getenv("ES_HOST", "http://elasticsearch:9200"))
 
-def simple_ai_logic(line):
-    """임시 AI 탐지 로직 (나중에 학습된 모델로 교체 가능)"""
-    line = line.lower()
-    if "select" in line or "union" in line:
-        return "A05:Injection (SQL)"
-    elif "<script>" in line or "alert(" in line:
-        return "A05:Injection (XSS)"
-    elif "../" in line or "/etc/passwd" in line:
-        return "A01:Broken Access Control"
-    return "Normal"
+# 모델 로드
+MODEL_PATH = "./model/owasp_model.pkl"
+VECT_PATH = "./model/vectorizer.pkl"
+
+if os.path.exists(MODEL_PATH):
+    model = joblib.load(MODEL_PATH)
+    vectorizer = joblib.load(VECT_PATH)
+else:
+    model = None
 
 @app.post("/upload-log")
 async def analyze_log(file: UploadFile = File(...)):
@@ -24,16 +25,21 @@ async def analyze_log(file: UploadFile = File(...)):
     for line in lines:
         if not line.strip(): continue
         
-        attack_type = simple_ai_logic(line)
+        # AI 모델 추론
+        if model:
+            features = vectorizer.transform([line])
+            prediction = model.predict(features)[0]
+            confidence = max(model.predict_proba(features)[0])
+        else:
+            prediction = "Model Not Found"
+            confidence = 0.0
+
         doc = {
             "log_line": line,
-            "owasp_category": attack_type,
+            "owasp_category": prediction,
+            "confidence": float(confidence),
             "timestamp": datetime.datetime.now().isoformat()
         }
-        # Elasticsearch에 저장
-        try:
-            es.index(index="owasp-logs", document=doc)
-        except Exception as e:
-            print(f"ES Error: {e}")
+        es.index(index="owasp-logs", document=doc)
             
-    return {"message": "분석 완료", "processed_lines": len(lines)}
+    return {"message": "AI 분석 및 저장 완료", "processed_lines": len(lines)}

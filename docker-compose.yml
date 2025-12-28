@@ -1,10 +1,10 @@
 services:
-  # 1. AI 분석 엔진
+  # 1. AI 분석 엔진 (포트 충돌 방지를 위해 8888 사용)
   ai-engine:
     build: ./ai_engine
     container_name: ai-analyzer
     ports:
-      - "8080:8000"  # 8000번 대신 8080 사용
+      - "8888:8000"  # 외부(맥북) 8888 -> 내부(컨테이너) 8000
     volumes:
       - ./data:/app/data
     environment:
